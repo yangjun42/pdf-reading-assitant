@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 加载上级目录的环境变量
-load_dotenv(dotenv_path=Path(__file__).parent.parent / '.env')
+load_dotenv()
 
 app = FastAPI(title="PDF Paper Analysis")
 

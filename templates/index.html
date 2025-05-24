@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF文档阅读助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .chapter-item {
+            cursor: pointer;
+            padding: 12px;
+            margin: 4px 0;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border: 1px solid #e9ecef;
+        }
+        .chapter-item:hover {
+            background-color: #f8f9fa;
+            border-color: #007bff;
+            transform: translateY(-1px);
+        }
+        .chapter-content {
+            margin-left: 20px;
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #007bff;
+        }
+        .qa-box {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        .answer-box {
+            background-color: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #007bff;
+        }
+        .token-info {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .token-badge {
+            display: inline-block;
+            margin-right: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        .token-input { background-color: #ffeaa7; color: #2d3436; }
+        .token-output { background-color: #74b9ff; color: #2d3436; }
+        .token-total { background-color: #fd79a8; color: #2d3436; }
+        .cache-badge {
+            background-color: #00b894;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            margin-left: 8px;
+        }
+        .operation-stats {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid #bbdefb;
+        }
+        .stats-title {
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+        
+        /* 改进的操作详情布局 */
+        .stats-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-start;
+        }
+        
+        .stats-item {
+            flex: 1 1 auto;
+            min-width: 150px;
+            padding: 8px 12px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 6px;
+            border-left: 3px solid #1976d2;
+        }
+        
+        .stats-item.token-details {
+            flex: 2 1 300px; /* Token详情给更多空间 */
+            min-width: 300px;
+        }
+        
+        .stats-item-label {
+            font-weight: bold;
+            color: #1976d2;
+            font-size: 0.85em;
+            margin-bottom: 2px;
+        }
+        
+        .stats-item-value {
+            color: #333;
+            font-size: 0.9em;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .stats-content {
+                flex-direction: column;
+            }
+            .stats-item {
+                min-width: 100%;
+            }
+        }
+        
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 醒目的总token统计样式 */
+        .total-token-counter {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 10px;
+            z-index: 1000;
+        }
+        
+        .token-counter-number {
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        
+        .token-counter-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        /* 关键词样式 */
+        .keyword-badge {
+            display: inline-block;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            margin: 2px 4px 2px 0;
+            border-radius: 12px;
+            font-size: 0.8em;
+            border: 1px solid #bbdefb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h1 class="mb-4">
+                    <i class="bi bi-file-earmark-pdf"></i> PDF文档阅读助手
+                    <small class="text-muted fs-6">支持缓存和Token统计</small>
+                </h1>
+            </div>
+        </div>
+        
+        <!-- 醒目的总Token统计 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div id="totalTokenCounter" class="total-token-counter" style="display: none;">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="token-counter-number" id="totalTokenNumber">0</div>
+                                <div class="token-counter-label">总Token消耗</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="token-counter-number" id="operationCount">0</div>
+                                <div class="token-counter-label">操作次数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div class="token-counter-number" id="cacheHits">0</div>
+                                <div class="token-counter-label">缓存命中</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <div id="currentFileName" class="token-counter-label">当前文件: 无</div>
+                                <div id="lastOperation" class="token-counter-label">最后操作: 无</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 文件上传区域 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi bi-cloud-upload"></i> 上传PDF文件</h5>
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <input type="file" class="form-control" id="pdfFile" accept=".pdf" required>
+                                <div class="form-text">支持的格式: PDF文件，最大文件大小: 50MB</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="uploadBtn">
+                                <span class="loading-spinner" id="uploadSpinner"></span>
+                                <span id="uploadBtnText">上传并分析</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="clearCache()">
+                                <i class="bi bi-trash"></i> 清空缓存
+                            </button>
+                            <button type="button" class="btn btn-info ms-2" onclick="manualResetSession()">
+                                <i class="bi bi-arrow-clockwise"></i> 重置会话
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作统计区域 -->
+        <div id="operationStats" class="row mb-4" style="display: none;">
+            <div class="col-md-12">
+                <div class="operation-stats">
+                    <div class="stats-title"><i class="bi bi-graph-up"></i> 本次操作详情</div>
+                    <div id="statsContent" class="stats-content"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分析结果区域 -->
+        <div class="row">
+            <div class="col-md-6">
+                <div id="analysisResult" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="bi bi-info-circle"></i> 文档信息</h5>
+                            <p><strong>标题:</strong> <span id="paperTitle"></span></p>
+                            <p><strong>总页数:</strong> <span id="totalPages"></span></p>
+                            <p><strong>目录提取方法:</strong> <span id="extractionMethod"></span></p>
+                            <div id="keywordsSection" style="display: none;">
+                                <p><strong>关键词:</strong></p>
+                                <div id="keywordsList" class="mb-2"></div>
+                            </div>
+                            <div id="abstractSection" style="display: none;">
+                                <p class="mb-1">
+                                    <strong>摘要:</strong>
+                                    <button class="btn btn-sm btn-outline-primary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#abstractContent" aria-expanded="false" aria-controls="abstractContent">
+                                        <i class="bi bi-chevron-down" id="abstractToggleIcon"></i> 展开查看
+                                    </button>
+                                </p>
+                                <div class="collapse" id="abstractContent">
+                                    <div class="card card-body bg-light">
+                                        <p id="abstractText" class="mb-0"></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="analysisTokenInfo" class="token-info" style="display: none;"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="bi bi-list-ul"></i> 目录结构</h5>
+                            <div id="chaptersList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 章节内容区域 -->
+            <div class="col-md-6">
+                <div id="chapterContent" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title" id="selectedChapterTitle">
+                                <i class="bi bi-book"></i> <span id="chapterTitleText"></span>
+                            </h5>
+                            <div id="chapterSummary" class="summary-box">
+                                <div class="loading-spinner" id="summarySpinner"></div>
+                                <span id="summaryText">加载中...</span>
+                            </div>
+                            <div id="summaryTokenInfo" class="token-info" style="display: none;"></div>
+                            
+                            <!-- 问答区域 -->
+                            <div class="qa-box">
+                                <h6><i class="bi bi-chat-dots"></i> 章节问答</h6>
+                                <form id="questionForm">
+                                    <div class="mb-3">
+                                        <textarea class="form-control" id="questionInput" rows="3" placeholder="请输入您关于本章节的问题..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <span class="loading-spinner" id="questionSpinner"></span>
+                                        <span id="questionBtnText">提问</span>
+                                    </button>
+                                </form>
+                                <div id="answerBox" class="answer-box" style="display: none;">
+                                    <h6><i class="bi bi-lightbulb"></i> 回答：</h6>
+                                    <p id="answerText"></p>
+                                    <div id="answerTokenInfo" class="token-info" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let currentChapter = null;
+        let totalTokensUsed = 0;
+        let operationCount = 0;
+        let cacheHitCount = 0;
+        let currentFileName = '';
+
+        // 更新总Token统计显示
+        function updateTotalTokenDisplay() {
+            document.getElementById('totalTokenNumber').textContent = totalTokensUsed.toLocaleString();
+            document.getElementById('operationCount').textContent = operationCount;
+            document.getElementById('cacheHits').textContent = cacheHitCount;
+            document.getElementById('currentFileName').textContent = `当前文件: ${currentFileName}`;
+            
+            // 显示总计数器
+            document.getElementById('totalTokenCounter').style.display = 'block';
+            
+            // 添加脉动效果
+            const counter = document.getElementById('totalTokenCounter');
+            counter.classList.add('pulse-animation');
+            setTimeout(() => counter.classList.remove('pulse-animation'), 2000);
+        }
+
+        // 格式化token信息显示
+        function formatTokenInfo(tokenUsage, operationType, cached = false) {
+            if (!tokenUsage) {
+                console.log('No token usage data provided');
+                return '';
+            }
+            
+            console.log('Formatting token info:', tokenUsage, operationType, cached);
+            
+            const inputBadge = `<span class="token-badge token-input">输入: ${tokenUsage.input_tokens || 0}</span>`;
+            const outputBadge = `<span class="token-badge token-output">输出: ${tokenUsage.output_tokens || 0}</span>`;
+            const totalBadge = `<span class="token-badge token-total">总计: ${tokenUsage.total_tokens || 0}</span>`;
+            const cacheBadge = cached ? `<span class="cache-badge">来自缓存</span>` : '';
+            
+            // 添加服务提供商信息
+            let serviceBadge = '';
+            if (tokenUsage.service) {
+                const serviceText = tokenUsage.service === 'github' ? 'GitHub Models' : 
+                                  tokenUsage.service === 'azure' ? 'Azure OpenAI' : 
+                                  tokenUsage.service === 'metadata' ? 'PDF元数据' : tokenUsage.service;
+                serviceBadge = `<span class="cache-badge" style="background-color: #6c757d;">服务: ${serviceText}</span>`;
+            }
+            
+            return `
+                <i class="bi bi-speedometer2"></i> ${operationType} Token使用: 
+                ${inputBadge} ${outputBadge} ${totalBadge} ${cacheBadge} ${serviceBadge}
+            `;
+        }
+
+        // 更新操作统计 - 改进布局
+        function updateOperationStats(tokenUsage, operationType, cached = false) {
+            console.log('Updating operation stats:', tokenUsage, operationType, cached);
+            
+            if (!cached && tokenUsage && tokenUsage.total_tokens) {
+                totalTokensUsed += tokenUsage.total_tokens;
+            }
+            
+            if (cached) {
+                cacheHitCount++;
+            }
+            
+            operationCount++;
+
+            // 更新详细统计 - 使用新的灵活布局
+            const statsContent = document.getElementById('statsContent');
+            
+            // 构建Token详情字符串
+            let tokenDetails = '无数据';
+            if (tokenUsage) {
+                const parts = [];
+                if (tokenUsage.input_tokens) parts.push(`输入: ${tokenUsage.input_tokens.toLocaleString()}`);
+                if (tokenUsage.output_tokens) parts.push(`输出: ${tokenUsage.output_tokens.toLocaleString()}`);
+                if (tokenUsage.total_tokens) parts.push(`总计: ${tokenUsage.total_tokens.toLocaleString()}`);
+                tokenDetails = parts.join(', ');
+            }
+            
+            statsContent.innerHTML = `
+                <div class="stats-item">
+                    <div class="stats-item-label">最后操作</div>
+                    <div class="stats-item-value">${operationType}</div>
+                </div>
+                <div class="stats-item token-details">
+                    <div class="stats-item-label">Token消耗详情</div>
+                    <div class="stats-item-value">${tokenDetails}</div>
+                </div>
+                <div class="stats-item">
+                    <div class="stats-item-label">数据来源</div>
+                    <div class="stats-item-value">${cached ? '缓存' : 'LLM'}</div>
+                </div>
+                <div class="stats-item">
+                    <div class="stats-item-label">操作时间</div>
+                    <div class="stats-item-value">${new Date().toLocaleTimeString()}</div>
+                </div>
+            `;
+            
+            document.getElementById('operationStats').style.display = 'block';
+            document.getElementById('lastOperation').textContent = `最后操作: ${operationType} ${cached ? '(缓存)' : ''}`;
+            
+            // 更新总计显示
+            updateTotalTokenDisplay();
+        }
+
+        // 显示加载状态
+        function showLoading(spinnerId, btnId, btnTextId, loadingText) {
+            document.getElementById(spinnerId).style.display = 'inline-block';
+            if (btnId) document.getElementById(btnId).disabled = true;
+            if (btnTextId) document.getElementById(btnTextId).textContent = loadingText;
+        }
+
+        // 隐藏加载状态
+        function hideLoading(spinnerId, btnId, btnTextId, normalText) {
+            document.getElementById(spinnerId).style.display = 'none';
+            if (btnId) document.getElementById(btnId).disabled = false;
+            if (btnTextId) document.getElementById(btnTextId).textContent = normalText;
+        }
+
+        // 重置会话状态
+        function resetSession(clearFileInput = false) {
+            currentFile = null;
+            currentChapter = null;
+            currentFileName = '';
+            
+            // 隐藏所有内容区域
+            document.getElementById('analysisResult').style.display = 'none';
+            document.getElementById('chapterContent').style.display = 'none';
+            document.getElementById('operationStats').style.display = 'none';
+            
+            // 清空问题输入框
+            document.getElementById('questionInput').value = '';
+            
+            // 可选：清空文件输入框
+            if (clearFileInput) {
+                document.getElementById('pdfFile').value = '';
+            }
+            
+            console.log('Session reset completed, clearFileInput:', clearFileInput);
+        }
+
+        // 手动重置会话（包括清空文件输入）
+        function manualResetSession() {
+            if (confirm('确定要重置会话吗？这将清空当前文件和所有分析结果。')) {
+                resetSession(true); // 清空文件输入框
+                // 重置token统计（但不清空）
+                document.getElementById('totalTokenCounter').style.display = 'none';
+                alert('会话已重置');
+            }
+        }
+
+        // 处理文件上传
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('pdfFile');
+            
+            if (!fileInput.files.length) {
+                alert('请选择PDF文件');
+                return;
+            }
+
+            // 获取文件名（在处理之前）
+            const selectedFileName = fileInput.files[0].name;
+            console.log('Starting upload for file:', selectedFileName);
+
+            // 只重置显示状态，不清空文件输入框
+            if (currentFile) {
+                // 如果已有文件，先重置会话状态
+                resetSession();
+            }
+            
+            currentFileName = selectedFileName;
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                showLoading('uploadSpinner', 'uploadBtn', 'uploadBtnText', '分析中...');
+
+                console.log('Sending upload request...');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Upload result:', result);
+                
+                if (result.status === 'success') {
+                    currentFile = result.file_path;
+                    displayAnalysis(result.analysis, result.token_usage, result.extraction_method);
+                    updateOperationStats(result.token_usage, '文档分析', false);
+                    
+                    // 成功后可以考虑清空文件输入框（可选）
+                    // fileInput.value = '';
+                } else {
+                    alert('处理文件时出错: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('上传文件时出错: ' + error);
+            } finally {
+                hideLoading('uploadSpinner', 'uploadBtn', 'uploadBtnText', '上传并分析');
+            }
+        });
+
+        // 显示分析结果
+        function displayAnalysis(analysis, tokenUsage, extractionMethod) {
+            console.log('Displaying analysis:', analysis, tokenUsage, extractionMethod);
+            
+            document.getElementById('paperTitle').textContent = analysis.title;
+            document.getElementById('totalPages').textContent = analysis.total_pages;
+            
+            // 显示提取方法 - 更新显示逻辑
+            let methodText = '';
+            if (extractionMethod === 'outline') {
+                methodText = 'PyMuPDF (推荐)';
+            } else if (extractionMethod === 'automatic_split') {
+                methodText = 'PyMuPDF (自动分割)';
+            } else if (extractionMethod === 'llm_analysis') {
+                // 显示具体使用的LLM服务
+                const service = tokenUsage && tokenUsage.service ? 
+                    (tokenUsage.service === 'github' ? 'GitHub Models' : 
+                     tokenUsage.service === 'azure' ? 'Azure OpenAI' : tokenUsage.service) : 
+                    'gpt-4o-mini';
+                methodText = `LLM（${service}）`;
+            } else {
+                methodText = extractionMethod || '未知';
+            }
+            document.getElementById('extractionMethod').textContent = methodText;
+            
+            // 显示关键词
+            const keywordsSection = document.getElementById('keywordsSection');
+            const keywordsList = document.getElementById('keywordsList');
+            
+            if (analysis.keywords && analysis.keywords.length > 0) {
+                keywordsList.innerHTML = '';
+                analysis.keywords.forEach(keyword => {
+                    const badge = document.createElement('span');
+                    badge.className = 'keyword-badge';
+                    badge.textContent = keyword;
+                    keywordsList.appendChild(badge);
+                });
+                keywordsSection.style.display = 'block';
+            } else {
+                keywordsSection.style.display = 'none';
+            }
+            
+            // 显示摘要
+            const abstractSection = document.getElementById('abstractSection');
+            const abstractText = document.getElementById('abstractText');
+            
+            if (analysis.subject && analysis.subject.trim()) {
+                abstractText.textContent = analysis.subject.trim();
+                abstractSection.style.display = 'block';
+                
+                // 重置折叠状态
+                const abstractContent = document.getElementById('abstractContent');
+                abstractContent.classList.remove('show');
+                
+                // 确保按钮文本正确
+                const toggleButton = document.querySelector('[data-bs-target="#abstractContent"]');
+                toggleButton.innerHTML = '<i class="bi bi-chevron-down"></i> 展开查看';
+            } else {
+                abstractSection.style.display = 'none';
+            }
+            
+            // 显示token信息
+            const analysisTokenInfo = document.getElementById('analysisTokenInfo');
+            if (tokenUsage) {
+                analysisTokenInfo.innerHTML = formatTokenInfo(tokenUsage, '文档分析');
+                analysisTokenInfo.style.display = 'block';
+            } else {
+                analysisTokenInfo.style.display = 'none';
+            }
+            
+            const chaptersList = document.getElementById('chaptersList');
+            chaptersList.innerHTML = '';
+            
+            analysis.chapters.forEach((chapter, index) => {
+                const chapterDiv = document.createElement('div');
+                chapterDiv.className = 'chapter-item';
+                chapterDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-file-text"></i> ${chapter.title}</span>
+                        <span class="text-muted">第${chapter.page_start}-${chapter.page_end || chapter.page_start}页</span>
+                    </div>
+                `;
+                
+                chapterDiv.addEventListener('click', () => showChapterContent(chapter));
+                chaptersList.appendChild(chapterDiv);
+            });
+
+            document.getElementById('analysisResult').style.display = 'block';
+        }
+
+        // 显示章节内容
+        async function showChapterContent(chapter) {
+            currentChapter = chapter;
+            document.getElementById('chapterTitleText').textContent = chapter.title;
+            document.getElementById('chapterContent').style.display = 'block';
+            document.getElementById('answerBox').style.display = 'none';
+            
+            // 清空之前的问题输入
+            document.getElementById('questionInput').value = '';
+            
+            // 显示加载状态
+            showLoading('summarySpinner');
+            document.getElementById('summaryText').textContent = '正在生成摘要...';
+            document.getElementById('summaryTokenInfo').style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('file_path', currentFile);
+                formData.append('chapter_title', chapter.title);
+                formData.append('page_start', chapter.page_start);
+                formData.append('page_end', chapter.page_end || chapter.page_start);
+
+                const response = await fetch('/summarize', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('Summarize result:', result);
+                
+                if (result.status === 'success') {
+                    document.getElementById('summaryText').textContent = result.summary;
+                    
+                    // 显示token信息
+                    const summaryTokenInfo = document.getElementById('summaryTokenInfo');
+                    if (result.token_usage) {
+                        summaryTokenInfo.innerHTML = formatTokenInfo(result.token_usage, '章节摘要', result.cached);
+                        summaryTokenInfo.style.display = 'block';
+                    }
+                    
+                    updateOperationStats(result.token_usage, '章节摘要', result.cached);
+                } else {
+                    document.getElementById('summaryText').textContent = '生成摘要时出错: ' + result.message;
+                }
+            } catch (error) {
+                console.error('Summarize error:', error);
+                document.getElementById('summaryText').textContent = '生成摘要时出错: ' + error;
+            } finally {
+                hideLoading('summarySpinner');
+            }
+        }
+
+        // 处理问题提交
+        document.getElementById('questionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const questionInput = document.getElementById('questionInput');
+            const question = questionInput.value.trim();
+            
+            if (!question) {
+                alert('请输入问题');
+                return;
+            }
+
+            if (!currentFile || !currentChapter) {
+                alert('请先选择章节');
+                return;
+            }
+
+            try {
+                showLoading('questionSpinner', null, 'questionBtnText', '思考中...');
+
+                const formData = new FormData();
+                formData.append('file_path', currentFile);
+                formData.append('chapter_title', currentChapter.title);
+                formData.append('page_start', currentChapter.page_start);
+                formData.append('page_end', currentChapter.page_end || currentChapter.page_start);
+                formData.append('question', question);
+
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                console.log('Ask result:', result);
+                
+                if (result.status === 'success') {
+                    document.getElementById('answerText').textContent = result.answer;
+                    
+                    // 显示token信息
+                    const answerTokenInfo = document.getElementById('answerTokenInfo');
+                    if (result.token_usage) {
+                        answerTokenInfo.innerHTML = formatTokenInfo(result.token_usage, '章节问答', result.cached);
+                        answerTokenInfo.style.display = 'block';
+                    }
+                    
+                    document.getElementById('answerBox').style.display = 'block';
+                    updateOperationStats(result.token_usage, '章节问答', result.cached);
+                } else {
+                    alert('回答问题时出错: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Ask error:', error);
+                alert('回答问题时出错: ' + error);
+            } finally {
+                hideLoading('questionSpinner', null, 'questionBtnText', '提问');
+            }
+        });
+
+        // 清空缓存
+        async function clearCache() {
+            if (confirm('确定要清空所有缓存吗？这将删除已保存的章节内容和分析结果。')) {
+                try {
+                    const response = await fetch('/cache/clear', { method: 'DELETE' });
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        alert('缓存已清空');
+                        // 重置统计信息
+                        totalTokensUsed = 0;
+                        operationCount = 0;
+                        cacheHitCount = 0;
+                        updateTotalTokenDisplay();
+                    }
+                } catch (error) {
+                    alert('清空缓存时出错: ' + error);
+                }
+            }
+        }
+        
+        // 摘要折叠功能的事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            const abstractContent = document.getElementById('abstractContent');
+            if (abstractContent) {
+                abstractContent.addEventListener('show.bs.collapse', function() {
+                    const toggleButton = document.querySelector('[data-bs-target="#abstractContent"]');
+                    if (toggleButton) {
+                        toggleButton.innerHTML = '<i class="bi bi-chevron-up"></i> 收起';
+                    }
+                });
+                
+                abstractContent.addEventListener('hide.bs.collapse', function() {
+                    const toggleButton = document.querySelector('[data-bs-target="#abstractContent"]');
+                    if (toggleButton) {
+                        toggleButton.innerHTML = '<i class="bi bi-chevron-down"></i> 展开查看';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
